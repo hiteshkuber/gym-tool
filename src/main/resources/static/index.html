@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gym Workout & Meal Tracker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+          background-color: #f8f9fa;
+        }
+        .nav-card {
+          transition: transform 0.2s ease;
+        }
+        .nav-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <h1 class="mb-4 text-center">🏋️‍♂️ Gym Workout & 🍽️ Meal Tracker</h1>
+    <p class="text-center text-muted">Select a section to begin</p>
+
+    <div class="row g-4">
+        <!-- Add Exercise -->
+        <div class="col-md-6 col-lg-4">
+            <a href="add_exercise.html" class="text-decoration-none">
+                <div class="card nav-card h-100 p-3 text-center">
+                    <h4 class="mb-2">➕ Log Workout</h4>
+                    <p class="text-muted">Add new workout/exercise details</p>
+                </div>
+            </a>
+        </div>
+        <!-- Workout History -->
+        <div class="col-md-6 col-lg-4">
+            <a href="workout_history.html" class="text-decoration-none">
+                <div class="card nav-card h-100 p-3 text-center">
+                    <h4 class="mb-2">📅 Workout History</h4>
+                    <p class="text-muted">View past workouts & AI insights</p>
+                </div>
+            </a>
+        </div>
+        <!-- Log Meal -->
+        <div class="col-md-6 col-lg-4">
+            <a href="meal_log.html" class="text-decoration-none">
+                <div class="card nav-card h-100 p-3 text-center">
+                    <h4 class="mb-2">🍽️ Log Meal</h4>
+                    <p class="text-muted">Upload meal image & get nutrition</p>
+                </div>
+            </a>
+        </div>
+        <!-- Meal History -->
+        <div class="col-md-6 col-lg-4">
+            <a href="meal_history.html" class="text-decoration-none">
+                <div class="card nav-card h-100 p-3 text-center">
+                    <h4 class="mb-2">📜 Meal History</h4>
+                    <p class="text-muted">See saved meals & AI nutrition insights</p>
+                </div>
+            </a>
+        </div>
+        <!-- Settings or Profile (optional) -->
+        <div class="col-md-6 col-lg-4">
+            <a href="#" class="text-decoration-none">
+                <div class="card nav-card h-100 p-3 text-center">
+                    <h4 class="mb-2">⚙️ Settings</h4>
+                    <p class="text-muted">Manage account & preferences</p>
+                </div>
+            </a>
+        </div>
+        <!-- Reports/Dashboard (optional) -->
+        <div class="col-md-6 col-lg-4">
+            <a href="#" class="text-decoration-none">
+                <div class="card nav-card h-100 p-3 text-center">
+                    <h4 class="mb-2">📊 Reports</h4>
+                    <p class="text-muted">Track your progress over time</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

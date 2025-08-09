@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Log Meal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h1 class="mb-4">Log Meal</h1>
+
+    <!-- Upload Form -->
+    <form id="mealForm">
+        <div class="mb-3">
+            <label class="form-label">Meal Image</label>
+            <input type="file" id="mealImage" accept="image/*" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Notes (optional)</label>
+            <textarea id="mealNotes" class="form-control"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Analyze</button>
+    </form>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="text-center my-3" style="display:none;">
+        <div class="spinner-border text-primary">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Analysis Result -->
+    <div id="analysisSection" style="display:none;">
+        <h4>Detected Nutritional Facts</h4>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Description</th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fats</th><th>Sugar</th>
+            </tr>
+            </thead>
+            <tbody id="analysisTable"></tbody>
+        </table>
+        <button id="confirmBtn" class="btn btn-success">Confirm & Save</button>
+    </div>
+
+    <!-- AI Feedback -->
+    <div id="feedback" class="alert alert-info mt-3" style="display:none;"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    const mealForm = document.getElementById('mealForm');
+    const mealImage = document.getElementById('mealImage');
+    const mealNotes = document.getElementById('mealNotes');
+    const analysisSection = document.getElementById('analysisSection');
+    const analysisTable = document.getElementById('analysisTable');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const spinner = document.getElementById('loadingSpinner');
+    const feedbackDiv = document.getElementById('feedback');
+
+    let currentMealItems = [];
+
+    function showLoading(flag) { spinner.style.display = flag ? 'block' : 'none'; }
+
+    // Analyze form submit
+    mealForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showLoading(true);
+      analysisTable.innerHTML = '';
+      analysisSection.style.display = 'none';
+      feedbackDiv.style.display = 'none';
+      const formData = new FormData();
+      formData.append('image', mealImage.files[0]);
+      formData.append('notes', mealNotes.value);
+
+      try {
+        const res = await fetch('/meal/analyze', {method: 'POST', body: formData});
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        currentMealItems = data;
+        renderAnalysis();
+      } catch (e) {
+        alert("Failed to analyze meal:\n" + e.message);
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    function renderAnalysis() {
+      analysisTable.innerHTML = '';
+      currentMealItems.forEach(item => {
+        analysisTable.innerHTML += `<tr>
+          <td>${item.description}</td>
+          <td>${item.calories}</td>
+          <td>${item.protein}</td>
+          <td>${item.carbs}</td>
+          <td>${item.fats}</td>
+          <td>${item.sugar}</td>
+        </tr>`;
+      });
+      analysisSection.style.display = 'block';
+    }
+
+    confirmBtn.addEventListener('click', async () => {
+      showLoading(true);
+      try {
+        const mealPayload = {
+          notes: mealNotes.value,
+          items: currentMealItems
+        };
+        const res = await fetch('/meal/confirm', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(mealPayload)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        feedbackDiv.innerHTML = `<strong>AI Nutrition Insight:</strong><br>${marked.parse(data.insight || '')}`;
+        feedbackDiv.style.display = 'block';
+      } catch (e) {
+        alert("Failed to save meal:\n" + e.message);
+      } finally {
+        showLoading(false);
+      }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Meal History & Insights</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .fw-bold { font-weight: bold !important; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h1 class="mb-4">Meal History</h1>
+    <div class="row">
+        <!-- LEFT: Meal List -->
+        <div class="col-md-8">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Notes</th>
+                    <th>Macros</th>
+                    <th>Insight</th>
+                </tr>
+                </thead>
+                <tbody id="mealHistoryBody"></tbody>
+            </table>
+            <div id="mealInsight" class="alert alert-success" style="display:none;"></div>
+            <div id="loadingSpinner" class="text-center mt-3" style="display:none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+        <!-- RIGHT: Period Insights -->
+        <div class="col-md-4">
+            <div class="accordion" id="insightAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#periodPanel">
+                            Period Nutrition Insights
+                        </button>
+                    </h2>
+                    <div id="periodPanel" class="accordion-collapse collapse show">
+                        <div class="accordion-body">
+                            <button id="insight7" class="btn btn-outline-primary w-100 mb-2">Last 7 Days</button>
+                            <button id="insight30" class="btn btn-outline-primary w-100 mb-2">Last 30 Days</button>
+                            <button id="insight365" class="btn btn-outline-primary w-100">Last 1 Year</button>
+                            <div id="periodInsight" class="alert alert-info mt-3" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const mealHistoryBody = document.getElementById("mealHistoryBody");
+    const mealInsightDiv = document.getElementById("mealInsight");
+    const periodInsightDiv = document.getElementById("periodInsight");
+    const loadingSpinner = document.getElementById("loadingSpinner");
+
+    let lastClickedButton = null;
+    let isFetching = false;
+    const cache = {};
+
+    function showLoading() { loadingSpinner.style.display = "block"; }
+    function hideLoading() { loadingSpinner.style.display = "none"; }
+
+    function highlightButton(btn) {
+      if (lastClickedButton) {
+        lastClickedButton.classList.remove("fw-bold", "btn-success");
+        lastClickedButton.classList.add("btn-outline-primary");
+      }
+      btn.classList.add("fw-bold", "btn-success");
+      btn.classList.remove("btn-outline-primary");
+      lastClickedButton = btn;
+    }
+
+    async function loadMealHistory() {
+      showLoading();
+      try {
+        const url = "/meal/history";
+        if (cache[url]) {
+          renderHistory(cache[url]);
+          hideLoading();
+          return;
+        }
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to load meal history.");
+        const meals = await res.json();
+        cache[url] = meals;
+        renderHistory(meals);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function renderHistory(meals) {
+      mealHistoryBody.innerHTML = "";
+      meals.forEach(meal => {
+        const macros = summarizeMealMacros(meal.items);
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${meal.date}</td>
+          <td>${meal.notes || ""}</td>
+          <td>Cal: ${macros.cal} | P: ${macros.p}g | C: ${macros.c}g | F: ${macros.f}g | S: ${macros.s}g</td>
+          <td><button class="btn btn-sm btn-outline-primary" data-id="${meal.id}">Get Insight</button></td>
+        `;
+        mealHistoryBody.appendChild(tr);
+      });
+
+      document.querySelectorAll("#mealHistoryBody button").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          highlightButton(e.target);
+          await getMealInsight(e.target.getAttribute("data-id"));
+        });
+      });
+    }
+
+    function summarizeMealMacros(items) {
+      let cal = 0, p=0, c=0, f=0, s=0;
+      items.forEach(it => {
+        cal += it.calories || 0;
+        p += it.protein || 0;
+        c += it.carbs || 0;
+        f += it.fats || 0;
+        s += it.sugar || 0;
+      });
+      return { cal, p, c, f, s };
+    }
+
+    async function getMealInsight(mealId) {
+      const url = "/meal/insight/" + mealId;
+      if (isFetching) return;
+      isFetching = true;
+      showLoading();
+      mealInsightDiv.style.display = "none";
+
+      if (cache[url]) {
+        mealInsightDiv.innerHTML = `<strong>Meal Insight:</strong><br>${marked.parse(cache[url])}`;
+        mealInsightDiv.style.display = "block";
+        hideLoading();
+        isFetching = false;
+        return;
+      }
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to get meal insight");
+        const data = await res.json();
+        cache[url] = data.insight || "";
+        mealInsightDiv.innerHTML = `<strong>Meal Insight:</strong><br>${marked.parse(cache[url])}`;
+        mealInsightDiv.style.display = "block";
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        hideLoading();
+        isFetching = false;
+      }
+    }
+
+    async function getPeriodNutritionInsight(url, btn) {
+      if (isFetching) return;
+      isFetching = true;
+      showLoading();
+      periodInsightDiv.style.display = "none";
+
+      if (cache[url]) {
+        periodInsightDiv.innerHTML = `<strong>Period Insight:</strong><br>${marked.parse(cache[url])}`;
+        periodInsightDiv.style.display = "block";
+        hideLoading();
+        isFetching = false;
+        return;
+      }
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to get period insight");
+        }
+        const data = await res.json();
+        cache[url] = data.insight || "";
+        highlightButton(btn);
+        periodInsightDiv.innerHTML = `<strong>Period Insight:</strong><br>${marked.parse(cache[url])}`;
+        periodInsightDiv.style.display = "block";
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        hideLoading();
+        isFetching = false;
+      }
+    }
+
+    document.getElementById("insight7").addEventListener("click", (e) =>
+      getPeriodNutritionInsight("/meal/insight/last7days", e.target)
+    );
+    document.getElementById("insight30").addEventListener("click", (e) =>
+      getPeriodNutritionInsight("/meal/insight/last30days", e.target)
+    );
+    document.getElementById("insight365").addEventListener("click", (e) =>
+      getPeriodNutritionInsight("/meal/insight/last365days", e.target)
+    );
+
+    loadMealHistory();
+</script>
+</body>
+</html>

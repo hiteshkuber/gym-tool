@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workout History & Insights</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        .fw-bold {
+          font-weight: bold !important;
+        }
+    </style>
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h1 class="mb-4">Workout History</h1>
+    <div class="row">
+        <!-- LEFT: HISTORY TABLE -->
+        <div class="col-md-8">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Exercises</th>
+                    <th>Get Insight</th>
+                </tr>
+                </thead>
+                <tbody id="historyBody"></tbody>
+            </table>
+            <div id="singleInsight" class="alert alert-success" style="display:none;"></div>
+            <div id="loadingSpinner" class="text-center mt-3" style="display:none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: PERIOD INSIGHTS -->
+        <div class="col-md-4">
+            <div class="accordion" id="insightAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#insightPanel">
+                            Period Insights
+                        </button>
+                    </h2>
+                    <div id="insightPanel" class="accordion-collapse collapse show">
+                        <div class="accordion-body">
+                            <button id="insight7" class="btn btn-outline-primary w-100 mb-2">Last 7 Days</button>
+                            <button id="insight30" class="btn btn-outline-primary w-100 mb-2">Last 30 Days</button>
+                            <button id="insight365" class="btn btn-outline-primary w-100">Last 1 Year</button>
+                            <div id="periodInsight" class="alert alert-info mt-3" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dependencies -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const cache = {};
+    let isFetching = false;
+    let lastClickedButton = null;
+
+    const historyBody = document.getElementById("historyBody");
+    const singleInsightDiv = document.getElementById("singleInsight");
+    const periodInsightDiv = document.getElementById("periodInsight");
+    const loadingSpinner = document.getElementById("loadingSpinner");
+
+    function showLoading() { loadingSpinner.style.display = "block"; }
+    function hideLoading() { loadingSpinner.style.display = "none"; }
+
+    function highlightButton(btn) {
+      if (lastClickedButton) {
+        lastClickedButton.classList.remove("fw-bold", "btn-success");
+        lastClickedButton.classList.add("btn-outline-primary");
+      }
+      btn.classList.add("fw-bold", "btn-success");
+      btn.classList.remove("btn-outline-primary");
+      lastClickedButton = btn;
+    }
+
+    async function loadHistory() {
+      showLoading();
+      try {
+        const url = "/history";
+        if (cache[url]) {
+          renderHistory(cache[url]);
+          hideLoading();
+          return;
+        }
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to load history.");
+        const workouts = await res.json();
+        cache[url] = workouts;
+        renderHistory(workouts);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function renderHistory(workouts) {
+      historyBody.innerHTML = "";
+      workouts.forEach(w => {
+        const tr = document.createElement("tr");
+        const exercisesList = w.exercises.map(ex => `${ex.name} (${ex.sets}x${ex.reps}@${ex.weight}kg)`).join(", ");
+        tr.innerHTML = `
+          <td>${w.date}</td>
+          <td>${exercisesList}</td>
+          <td><button class="btn btn-sm btn-outline-primary" data-id="${w.id}">Get Insight</button></td>
+        `;
+        historyBody.appendChild(tr);
+      });
+
+      document.querySelectorAll("#historyBody button").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          highlightButton(e.target);
+          await getSingleInsight(e.target.getAttribute("data-id"));
+        });
+      });
+    }
+
+    async function getSingleInsight(workoutId) {
+      const url = "/insight?id=" + workoutId;
+      if (isFetching) return;
+      isFetching = true;
+      showLoading();
+      singleInsightDiv.style.display = "none";
+
+      if (cache[url]) {
+        singleInsightDiv.innerHTML = `<strong>Workout Insight:</strong><br>${marked.parse(cache[url])}`;
+        singleInsightDiv.style.display = "block";
+        hideLoading();
+        isFetching = false;
+        return;
+      }
+
+      try {
+        const resp = await fetch("/insight", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workoutId: parseInt(workoutId) }),
+        });
+        if (!resp.ok) throw new Error("Failed to get insight");
+        const data = await resp.json();
+        cache[url] = data.insight || "";
+        singleInsightDiv.innerHTML = `<strong>Workout Insight:</strong><br>${marked.parse(cache[url])}`;
+        singleInsightDiv.style.display = "block";
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        hideLoading();
+        isFetching = false;
+      }
+    }
+
+    async function getPeriodInsight(url, btn) {
+      if (isFetching) return;
+      isFetching = true;
+      showLoading();
+      periodInsightDiv.style.display = "none";
+
+      if (cache[url]) {
+        periodInsightDiv.innerHTML = `<strong>Period Insight:</strong><br>${marked.parse(cache[url])}`;
+        periodInsightDiv.style.display = "block";
+        hideLoading();
+        isFetching = false;
+        return;
+      }
+
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.error || "Failed to get insight");
+        }
+        const data = await resp.json();
+        cache[url] = data.insight || "";
+        periodInsightDiv.innerHTML = `<strong>Period Insight:</strong><br>${marked.parse(cache[url])}`;
+        periodInsightDiv.style.display = "block";
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        hideLoading();
+        isFetching = false;
+      }
+    }
+
+    // Period button events
+    document.getElementById("insight7").addEventListener("click", (e) => {
+      highlightButton(e.target);
+      getPeriodInsight("/insight/last7days", e.target);
+    });
+    document.getElementById("insight30").addEventListener("click", (e) => {
+      highlightButton(e.target);
+      getPeriodInsight("/insight/last30days", e.target);
+    });
+    document.getElementById("insight365").addEventListener("click", (e) => {
+      highlightButton(e.target);
+      getPeriodInsight("/insight/last365days", e.target);
+    });
+
+    // Initial load
+    loadHistory();
+</script>
+</body>
+</html>
